@@ -6,12 +6,12 @@ import ora from 'ora';
 import Table from 'cli-table3';
 
 export default class WhoAmI extends Command {
-    static description = 'Giriş yapmış olan kullanıcı bilgisini göster';
+    static description = 'Show the logged-in user';
 
     async run() {
         await AuthGuard.check();
 
-        const spinner = ora('Kullanıcı bilgileri alınıyor...').start();
+        const spinner = ora('Fetching user info...').start();
 
         try {
             const api = await ApiService.getInstance();
@@ -21,7 +21,7 @@ export default class WhoAmI extends Command {
             spinner.stop();
             
             const table = new Table({
-                head: [chalk.cyan('Alan'), chalk.cyan('Değer')],
+                head: [chalk.cyan('Field'), chalk.cyan('Value')],
                 chars: {
                     'top': '═', 'top-mid': '╤', 'top-left': '╔', 'top-right': '╗',
                     'bottom': '═', 'bottom-mid': '╧', 'bottom-left': '╚', 'bottom-right': '╝',
@@ -32,16 +32,16 @@ export default class WhoAmI extends Command {
 
             table.push(
                 { 'Ad Soyad': `${user.name} ${user.surname}` },
-                { 'Kullanıcı Adı': user.username },
+                { 'Username': user.username },
                 { 'E-Posta': user.email },
-                { 'Kullanıcı ID': user.id }
+                { 'User ID': user.id }
             );
 
-            this.log('\n' + chalk.green.bold('✓ Başarıyla giriş yapıldı!') + '\n');
+            this.log('\n' + chalk.green.bold('✓ Logged in!') + '\n');
             this.log(table.toString());
-            this.log(); // Boş satır
+            this.log(); // Empty line
         } catch (error: any) {
-            spinner.fail(chalk.red('Kullanıcı bilgileri alınamadı.'));
+            spinner.fail(chalk.red('Could not fetch user info.'));
             this.error(error.response?.data?.message || error.message);
         }
     }

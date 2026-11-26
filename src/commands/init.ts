@@ -9,7 +9,7 @@ import { ApiService } from '../services/api.service';
 import { MANIFEST_FILE, syncManifestWithApi } from '../utils/manifest';
 
 export default class Init extends Command {
-    static description = 'Sıfırdan geliştirme yapmak için yerel klasörde Marketplace temasını init eder.';
+    static description = 'Initializes a Marketplace theme in the local folder to develop from scratch.';
 
     async run() {
         const projectDir = process.cwd();
@@ -19,20 +19,20 @@ export default class Init extends Command {
         try {
             api = await ApiService.getInstance();
         } catch (error: any) {
-            this.error(chalk.red("API'ye bağlanılamadı: " + error.message));
+            this.error(chalk.red("Could not connect to the API: " + error.message));
         }
 
-        this.log(chalk.cyan('Crafter Tema Geliştirme (Marketplace)'));
+        this.log(chalk.cyan('Crafter Theme Development (Marketplace)'));
 
         const action = await select({
             message: 'Ne yapmak istiyorsunuz?',
             choices: [
                 {
-                    name: 'Yeni bir tema oluştur',
+                    name: 'Create a new theme',
                     value: 'new',
                 },
                 {
-                    name: 'Var olan bir temamı seç',
+                    name: 'Pick one of my existing themes',
                     value: 'existing',
                 },
             ],
@@ -41,11 +41,11 @@ export default class Init extends Command {
         let themeId: string | null = null;
 
         if (action === 'new') {
-            const name = await input({ message: 'Tema adı:', required: true });
-            const description = await input({ message: 'Açıklama (opsiyonel):' });
+            const name = await input({ message: 'Theme name:', required: true });
+            const description = await input({ message: 'Description (optional):' });
             const version = await input({ message: 'Versiyon:', default: '1.0.0' });
 
-            const spinner = ora('Geliştirici teması oluşturuluyor...').start();
+            const spinner = ora('Creating the developer theme...').start();
             try {
                 const res = await api.post('/marketplace/themes/dev-theme', {
                     name,
@@ -53,31 +53,31 @@ export default class Init extends Command {
                     version
                 });
                 themeId = res.data.data.id;
-                spinner.succeed(chalk.green(`Tema başarıyla oluşturuldu! (ID: ${themeId})`));
+                spinner.succeed(chalk.green(`Theme created! (ID: ${themeId})`));
             } catch (error: any) {
-                spinner.fail(chalk.red('Tema oluşturulamadı.'));
+                spinner.fail(chalk.red('Could not create the theme.'));
                 this.error(error.response?.data?.message || error.message);
             }
         } else {
-            const spinner = ora('Temalarınız getiriliyor...').start();
+            const spinner = ora('Fetching your themes...').start();
             try {
                 const res = await api.get('/marketplace/themes/my-themes/list');
                 const themes = res.data;
                 spinner.stop();
 
                 if (!themes || themes.length === 0) {
-                    this.error(chalk.red('Hesabınıza kayıtlı bir tema bulunamadı. Lütfen yeni tema oluşturun.'));
+                    this.error(chalk.red('No themes found on your account. Please create a new theme.'));
                 }
 
                 themeId = await select({
-                    message: 'Geliştirmek istediğiniz temayı seçin:',
+                    message: 'Select the theme you want to develop:',
                     choices: themes.map((t: any) => ({
                         name: `${t.name} (v${t.version || '1.0.0'})`,
                         value: t.id
                     }))
                 });
             } catch (error: any) {
-                spinner.fail(chalk.red('Temalar getirilirken hata oluştu.'));
+                spinner.fail(chalk.red('An error occurred while fetching themes.'));
                 this.error(error.response?.data?.message || error.message);
             }
         }
@@ -92,20 +92,20 @@ export default class Init extends Command {
             }
             await fs.writeJSON(localConfigPath, { ...currentConfig, themeId }, { spaces: 2 });
 
-            // Sadece dizin boşsa veya iskelet yoksa boilerplate dosyaları oluştur
+            // Only create boilerplate files if the directory is empty or has no skeleton
             if (!fs.existsSync(path.join(projectDir, 'layout', 'theme.liquid'))) {
                 
                 const pullTemplate = await confirm({
-                    message: 'Varsayılan başlangıç şablonunu (Crafter-CMS/Liquided-Theme) indirmek ister misiniz?',
+                    message: 'Download the default starter template (Crafter-CMS/Liquided-Theme)?',
                     default: true
                 });
 
                 if (pullTemplate) {
-                    const cloneSpinner = ora('Şablon indiriliyor (https://github.com/Crafter-CMS/Liquided-Theme)...').start();
+                    const cloneSpinner = ora('Downloading the template (https://github.com/Crafter-CMS/Liquided-Theme)...').start();
                     try {
                         const tempDir = path.join(projectDir, '.temp-theme');
                         
-                        // Önceki temp klasörü kaldıysa temizle
+                        // Clean up a leftover temp folder from a previous run
                         if (fs.existsSync(tempDir)) {
                             await fs.remove(tempDir);
                         }
@@ -114,36 +114,36 @@ export default class Init extends Command {
                         
                         const items = await fs.readdir(tempDir);
                         for (const item of items) {
-                            // Şablonun manifesti başka bir temaya (şablonun kendisine) aittir; yerel manifestin yerine geçmez
+                            // The template's manifest belongs to another theme (the template itself); it does not replace the local manifest
                             if (item === '.git' || item === MANIFEST_FILE) continue;
                             await fs.move(path.join(tempDir, item), path.join(projectDir, item), { overwrite: true });
                         }
                         
                         await fs.remove(tempDir);
-                        cloneSpinner.succeed(chalk.green('Şablon başarıyla indirildi!'));
+                        cloneSpinner.succeed(chalk.green('Template downloaded!'));
                     } catch (e: any) {
-                        cloneSpinner.fail(chalk.red('Şablon indirilirken bir hata oluştu: ' + e.message));
-                        this.log(chalk.yellow('Boş tema iskeleti oluşturuluyor...'));
+                        cloneSpinner.fail(chalk.red('An error occurred while downloading the template: ' + e.message));
+                        this.log(chalk.yellow('Creating an empty theme skeleton...'));
                         await this.createBoilerplate(projectDir);
                     }
                 } else {
-                    this.log(chalk.gray('Boş tema iskeleti dosyaları oluşturuluyor...'));
+                    this.log(chalk.gray('Creating empty theme skeleton files...'));
                     await this.createBoilerplate(projectDir);
                 }
             }
 
-            // crafter-manifest.json yerel kalır: sunucu manifesti yalnızca eksik alanları doldurur, yazma onayla yapılır
+            // crafter-manifest.json stays local: the server manifest only fills missing fields, and writes need confirmation
             await syncManifestWithApi(projectDir, themeId, api, (m) => this.log(chalk.yellow(m)), true);
 
-            this.log(chalk.green('\n✅ Init işlemi tamamlandı!'));
-            this.log(chalk.blue('Şimdi "npx @crafter-cms/cli dev" komutunu çalıştırarak geliştirmeye başlayabilirsiniz.'));
+            this.log(chalk.green('\n✅ Init complete!'));
+            this.log(chalk.blue('Run "npx @crafter-cms/cli dev" to start developing.'));
         }
     }
 
     private async createBoilerplate(projectDir: string) {
         const filesToCreate = {
             'layout/theme.liquid': `<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>{{ shop.name }}</title>\n    {{ content_for_header }}\n    <link rel="stylesheet" href="{{ 'theme.css' | asset_url }}">\n</head>\n<body>\n    <header>\n        <h1>{{ shop.name }}</h1>\n    </header>\n\n    <main id="MainContent">\n        {{ content_for_layout }}\n    </main>\n\n    <footer>\n        <p>&copy; {{ 'now' | date: "%Y" }} {{ shop.name }}</p>\n    </footer>\n</body>\n</html>`,
-            'templates/index.liquid': `<h2>Hoş Geldiniz</h2>\n<p>Bu sizin yeni Crafter temanızın ana sayfasıdır.</p>`,
+            'templates/index.liquid': `<h2>Welcome</h2>\n<p>This is the home page of your new Crafter theme.</p>`,
             'assets/theme.css': `body {\n    font-family: sans-serif;\n    margin: 0;\n    padding: 0;\n}\nheader, footer {\n    background-color: #f4f4f4;\n    padding: 20px;\n    text-align: center;\n}\nmain {\n    padding: 20px;\n    min-height: 50vh;\n}\n`,
             'config/settings_schema.json': `[]`
         };

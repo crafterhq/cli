@@ -21,8 +21,8 @@ afterAll(async () => {
 
 const mode = async (p: string) => (await fs.stat(p)).mode & 0o777;
 
-describe.skipIf(isWindows)('ConfigService dosya izinleri', () => {
-    it('yeni config dosyasını 0600, klasörü 0700 ile oluşturur', async () => {
+describe.skipIf(isWindows)('ConfigService file permissions', () => {
+    it('creates a new config file with 0600 and the folder with 0700', async () => {
         await ConfigService.setConfig({ accessToken: 'test-access', refreshToken: 'test-refresh' });
         const file = path.join(dir, 'config.json');
         expect(ConfigService.configPath).toBe(file);
@@ -31,14 +31,14 @@ describe.skipIf(isWindows)('ConfigService dosya izinleri', () => {
         expect((await fs.readJson(file)).accessToken).toBe('test-access');
     });
 
-    it('daha geniş izinli var olan dosyayı yazarken 0600 yapar', async () => {
+    it('sets 0600 when writing an existing file with wider permissions', async () => {
         const file = path.join(dir, 'config.json');
         await fs.chmod(file, 0o644);
         await ConfigService.setConfig({ accessToken: 'test-access-2' });
         expect(await mode(file)).toBe(0o600);
     });
 
-    it('clearConfig de 0600 korur ve token alanlarını siler', async () => {
+    it('clearConfig keeps 0600 and removes the token fields', async () => {
         const file = path.join(dir, 'config.json');
         await fs.chmod(file, 0o666);
         await ConfigService.clearConfig();

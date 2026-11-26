@@ -25,11 +25,11 @@ import * as http from 'http';
 import { WebSocketServer } from 'ws';
 
 export default class Dev extends Command {
-    static description = "Akıllı senkronizasyon ve Development Theme izleme aracı.";
+    static description = "Smart sync and development theme watcher.";
 
     static flags = {
-        website: Flags.string({ char: 'w', description: 'Test edilecek Website ID (Belirtilmezse Demo Website kullanılır)' }),
-        theme: Flags.string({ char: 't', description: 'Theme ID (Belirtilmezse init edilen tema kullanılır)' }),
+        website: Flags.string({ char: 'w', description: 'Website ID to test against (defaults to the demo website)' }),
+        theme: Flags.string({ char: 't', description: 'Theme ID (defaults to the initialized theme)' }),
     };
 
     async run() {
@@ -51,30 +51,30 @@ export default class Dev extends Command {
         }
 
         if (!themeId) {
-            this.error(chalk.red('Theme ID bulunamadı. Lütfen önce "npx @crafter-cms/cli init" komutunu çalıştırın veya -t <themeId> parametresini belirtin.'));
+            this.error(chalk.red('Theme ID not found. Run "npx @crafter-cms/cli init" first or pass -t <themeId>.'));
         }
 
         let api: any;
         try {
             api = await ApiService.getInstance();
         } catch (error: any) {
-            this.error(chalk.red("API'ye bağlanılamadı: " + error.message));
+            this.error(chalk.red("Could not connect to the API: " + error.message));
         }
 
-        // crafter-manifest.json yerel kalır: sunucu manifesti yalnızca eksik alanları doldurur, yazma onayla yapılır
+        // crafter-manifest.json stays local: the server manifest only fills missing fields, and writes need confirmation
         await syncManifestWithApi(projectDir, themeId as string, api, (m) => this.log(chalk.yellow(m)));
 
-        // Hem yeni hem mevcut tema için başlangıçta tüm dosyaları senkronize et
-        const pushSpinner = ora('Tüm dosyalar senkronize ediliyor (assets dahil)...').start();
+        // Sync all files at startup, for both new and existing themes
+        const pushSpinner = ora('Syncing all files (including assets)...').start();
         try {
             const result = await syncThemeFiles(api, themeId as string, projectDir, (m) => { pushSpinner.text = m; });
-            pushSpinner.succeed(chalk.green(`Tüm dosyalar başarıyla yüklendi! (${result.fileCount} dosya)`));
+            pushSpinner.succeed(chalk.green(`All files uploaded! (${result.fileCount} files)`));
             if (result.skipped.length > 0) {
-                this.log(chalk.yellow(`${result.skipped.length} dosya gönderilmedi / ${result.skipped.length} file(s) not uploaded:`));
+                this.log(chalk.yellow(`${result.skipped.length} file(s) not uploaded:`));
                 formatSkippedFiles(result.skipped).forEach((l) => this.log(chalk.yellow(l)));
             }
         } catch (error: any) {
-            pushSpinner.fail(chalk.red('Dosya senkronizasyonu başarısız: ' + (error.response?.data?.message || error.message)));
+            pushSpinner.fail(chalk.red('File sync failed: ' + (error.response?.data?.message || error.message)));
         }
 
         // ==========================================
@@ -83,7 +83,7 @@ export default class Dev extends Command {
         const proxyPort = 9292;
         const targetStorefront = await ConfigService.getStorefrontUrl();
 
-        // #319 sonrası dev kaynağı imzalı token olmadan 403 alır: önizlemeyi kapat, izleme ve senkronizasyon sürsün
+        // Since #319 the dev source gets a 403 without a signed token: disable preview, keep watching and syncing
         let previewUnavailableShown = false;
         let publishedUrl: string | undefined;
         const showPreviewUnavailable = async () => {
@@ -125,13 +125,13 @@ export default class Dev extends Command {
                 if (!out.headersSent) {
                     out.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
                 }
-                out.end('Storefront erişilemiyor / Storefront unreachable: ' + err.message);
+                out.end('Storefront unreachable: ' + err.message);
             } catch (e) { }
         });
 
         proxy.on('proxyRes', (proxyRes, req, res) => {
             if (isDevPreviewForbidden(proxyRes.statusCode)) {
-                // Token olmadan dev kaynağı reddedildi: yanıtı tüket, açıklayıcı sayfa göster, süreci sonlandırma
+                // Dev source rejected without a token: drain the response, show an explanatory page, keep the process running
                 proxyRes.resume();
                 showPreviewUnavailable().finally(() => {
                     if (!res.headersSent) {
@@ -156,7 +156,7 @@ export default class Dev extends Command {
     const ws = new WebSocket('ws://' + window.location.host);
     ws.onmessage = (event) => {
         if (event.data === 'reload') {
-            console.log('Dosya değişti, sayfa yenileniyor...');
+            console.log('File changed, reloading the page...');
             window.location.reload();
         }
     };
@@ -194,7 +194,7 @@ export default class Dev extends Command {
                 urlObj.searchParams.set('themeId', themeId as string);
                 // urlObj.searchParams.set('preview_website_id', websiteId as string); // For Storefront to know which website data to load
                 
-                // Ayrıca header olarak da ekleyelim (Storefront nasıl okuyorsa)
+                // Also add it as a header (in case the storefront reads it from there)
                 // req.headers['x-crafter-website-id'] = websiteId as string;
                 req.headers['x-crafter-theme-id'] = themeId as string;
                 req.headers[DEV_THEME_VERSION_HEADER] = 'dev';
@@ -215,22 +215,22 @@ export default class Dev extends Command {
         });
 
         server.on('error', (err: any) => {
-            this.log(chalk.yellow(`Önizleme sunucusu başlatılamadı (port ${proxyPort}): ${err.message}. Dosya izleme devam ediyor. / Preview server could not start; file watching continues.`));
+            this.log(chalk.yellow(`Preview server could not start (port ${proxyPort}): ${err.message}. File watching continues.`));
         });
 
         if (previewEnabled) {
             server.listen(proxyPort, () => {
-                this.log(chalk.cyan("\n🌍 Canlı Önizleme: " + chalk.underline("http://localhost:" + proxyPort) + "\n"));
+                this.log(chalk.cyan("\n🌍 Live preview: " + chalk.underline("http://localhost:" + proxyPort) + "\n"));
             });
         }
 
         // ==========================================
         // CHOKIDAR WATCHER
         // ==========================================
-        const watchSpinner = ora('Dosya değişiklikleri izleniyor (Watch Mode)...').start();
+        const watchSpinner = ora('Watching for file changes (watch mode)...').start();
 
         const watcher = chokidar.watch(projectDir, {
-            // zip ile aynı ortak yok sayma listesi (gizli dosyalar, node_modules, dist, .zip ...)
+            // same shared ignore list as zip (hidden files, node_modules, dist, .zip ...)
             ignored: (filePath: string) => isIgnoredPath(toThemeKey(projectDir, filePath)),
             persistent: true,
             ignoreInitial: true,
@@ -246,11 +246,11 @@ export default class Dev extends Command {
             } catch (e) { }
             const skipReason = getUploadSkipReason(relativePath, size);
             if (skipReason) {
-                this.log(chalk.yellow(`Atlandı / Skipped: ${relativePath} (${describeSkipReason(skipReason)})`));
+                this.log(chalk.yellow(`Skipped: ${relativePath} (${describeSkipReason(skipReason)})`));
                 return;
             }
 
-            const fileSpinner = ora("Yükleniyor: " + relativePath).start();
+            const fileSpinner = ora("Uploading: " + relativePath).start();
 
             try {
                 const ext = path.extname(filePath).toLowerCase();
@@ -269,7 +269,7 @@ export default class Dev extends Command {
 
                 await api.put(`/marketplace/themes/${themeId}/file`, payload);
 
-                fileSpinner.succeed(chalk.green("Yüklendi: " + relativePath));
+                fileSpinner.succeed(chalk.green("Uploaded: " + relativePath));
 
                 // Broadcast reload
                 wss.clients.forEach(client => {
@@ -279,10 +279,10 @@ export default class Dev extends Command {
                 });
 
             } catch (error: any) {
-                fileSpinner.fail(chalk.red("Hata: " + relativePath));
+                fileSpinner.fail(chalk.red("Error: " + relativePath));
                 const status = error.response?.status;
                 if (status === 400 || status === 413) {
-                    console.error(chalk.yellow(`Sunucu dosyayı reddetti (${status}) / Server rejected the file: ` + (error.response?.data?.message || error.message)));
+                    console.error(chalk.yellow(`Server rejected the file (${status}): ` + (error.response?.data?.message || error.message)));
                 } else {
                     console.error(error.response?.data?.message || error.message);
                 }
@@ -291,7 +291,7 @@ export default class Dev extends Command {
 
         const deleteFile = async (filePath: string) => {
             const relativePath = toThemeKey(projectDir, filePath);
-            // Sunucuya hiç gönderilmeyen dosyalar için silme isteği atılmaz
+            // No delete request is sent for files that were never uploaded
             if (LOCAL_ONLY_FILES.includes(relativePath) || getUploadSkipReason(relativePath)) return;
             const fileSpinner = ora("Siliniyor: " + relativePath).start();
             try {
@@ -305,7 +305,7 @@ export default class Dev extends Command {
                     }
                 });
             } catch (error: any) {
-                fileSpinner.fail(chalk.red("Hata (Silme): " + relativePath));
+                fileSpinner.fail(chalk.red("Error (delete): " + relativePath));
                 console.error(error.response?.data?.message || error.message);
             }
         };

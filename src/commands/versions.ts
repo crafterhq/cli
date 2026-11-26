@@ -8,7 +8,7 @@ import Table from 'cli-table3';
 import ora from 'ora';
 
 export default class Versions extends Command {
-    static description = 'Temanın versiyonlarını listele';
+    static description = 'List the theme versions';
 
     static flags = {
         theme: Flags.string({ char: 't', description: 'Theme ID (Opsiyonel)' }),
@@ -22,16 +22,16 @@ export default class Versions extends Command {
         const themeId = await resolveThemeId(projectDir, flags.theme);
 
         if (!themeId) {
-            this.error(chalk.red('Theme ID bulunamadı. Lütfen "npx @crafter-cms/cli init" komutunu çalıştırın veya -t parametresi ile belirtin.'));
+            this.error(chalk.red('Theme ID not found. Run "npx @crafter-cms/cli init" or pass it with -t.'));
         }
 
         const spinner = ora('Versiyonlar listeleniyor...').start();
 
         try {
-            this.log(chalk.yellow('\n[BILGI] Tema versiyonlama (versions) özelliği şu anda geliştirme aşamasındadır. Yeni Marketplace mimarisinde versiyon geçmişleri yakında aktif edilecektir.\n'));
+            this.log(chalk.yellow('\n[INFO] Theme versioning (versions) is currently under development. Version history in the new Marketplace architecture will be enabled soon.\n'));
             spinner.stop();
         } catch (error: any) {
-            spinner.fail(chalk.red('Versiyonlar alınamadı.'));
+            spinner.fail(chalk.red('Could not fetch the versions.'));
             this.error(error.message);
         }
     }

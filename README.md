@@ -1,38 +1,38 @@
 # @crafter-cms/cli
 
-Crafter platformu için tema yönetim aracı (Marketplace).
+Theme management tool for the Crafter platform (Marketplace).
 
-## Kurulum
+## Installation
 
 ```bash
 npm install -g @crafter-cms/cli
 ```
 
-Veya `npx` ile doğrudan kullanın:
+Or use it directly with `npx`:
 
 ```bash
-npx @crafter-cms/cli <komut>
+npx @crafter-cms/cli <command>
 ```
 
-Kısayol komutu:
+Shortcut command:
 
 ```bash
-crafter <komut>
+crafter <command>
 ```
 
-## Komutlar
+## Commands
 
-### Kimlik Doğrulama
+### Authentication
 
-- `crafter login`: Tarayıcı üzerinden giriş yapın.
-- `crafter logout`: Oturumu kapatın.
-- `crafter whoami`: Giriş yapmış olan kullanıcı bilgisini görün.
+- `crafter login`: Log in through the browser.
+- `crafter logout`: Log out.
+- `crafter whoami`: Show the logged-in user.
 
-### Tema Geliştirme
+### Theme Development
 
-- `crafter init`: Yeni bir tema projesi başlatın veya var olan temanızı seçin.
-- `crafter dev`: Akıllı senkronizasyon ve geliştirme izleme (watcher) aracını başlatın. (1.0.7: canlı önizleme güvenlik güncellemesi nedeniyle geçici olarak kapalı; dosya senkronizasyonu çalışır.)
-- `crafter push`: Yerel dosyaları tamamen buluta yükleyin (Sıfırdan senkronizasyon).
-- `crafter pull`: Buluttaki tüm dosyaları yerel klasöre indirin. (1.0.7: sunucuda indirme uç noktası olmadığı için geçici olarak kullanılamıyor.)
-- `crafter pack`: Temayı satmak/dağıtmak üzere .zip haline getirin.
-- `crafter publish`: Geliştirme (dev) ortamınızdaki dosyaları alıp resmi bir sürüm (versiyon) olarak paketler ve onay sürecine gönderir.
+- `crafter init`: Start a new theme project or pick one of your existing themes.
+- `crafter dev`: Start the smart sync and development watcher. (1.0.7: live preview is temporarily disabled after a security update; file sync works.)
+- `crafter push`: Upload all local files to the cloud (full sync).
+- `crafter pull`: Download all files from the cloud into the local folder. (1.0.7: temporarily unavailable because the server has no download endpoint.)
+- `crafter pack`: Pack the theme into a .zip for sale or distribution.
+- `crafter publish`: Takes the files in your development (dev) environment, packages them as an official release (version) and submits it for review.

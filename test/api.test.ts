@@ -22,7 +22,7 @@ afterAll(async () => {
 });
 
 describe('ApiService.refreshTokens', () => {
-    it('yenilenen access ve refresh token\'ı config dosyasına kaydeder, eşzamanlı istekleri tek yenilemede toplar', async () => {
+    it('saves the refreshed access and refresh tokens to the config file and merges concurrent requests into one refresh', async () => {
         await ConfigService.setConfig({ accessToken: 'old-access', refreshToken: 'old-refresh' });
         const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { accessToken: 'new-access', refreshToken: 'new-refresh' } });
 
@@ -39,7 +39,7 @@ describe('ApiService.refreshTokens', () => {
         expect(saved.refreshToken).toBe('new-refresh');
     });
 
-    it('sunucu refresh token döndürmezse eskisini korur', async () => {
+    it('keeps the old refresh token if the server does not return one', async () => {
         await ConfigService.setConfig({ accessToken: 'old-access', refreshToken: 'keep-refresh' });
         vi.spyOn(axios, 'post').mockResolvedValue({ data: { accessToken: 'only-access' } });
         await ApiService.refreshTokens('https://api.example.test', 'keep-refresh');

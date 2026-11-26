@@ -1,8 +1,8 @@
 import * as path from 'path';
 
 /**
- * Archiver modülünün farklı sürümleriyle (v7 function vs v8 ZipArchive class)
- * ve CommonJS/ESM ortamlarıyla tam uyumlu ZIP arşivi oluşturucu.
+ * ZIP archive builder fully compatible with different archiver versions (v7 function vs v8 ZipArchive class)
+ * and with CommonJS/ESM environments.
  */
 export function createZipArchive(options: any = { zlib: { level: 6 } }): any {
     const archiverModule = require('archiver');
@@ -21,17 +21,17 @@ export function createZipArchive(options: any = { zlib: { level: 6 } }): any {
             return archiverModule.default('zip', options);
         }
     }
-    throw new Error('ZIP arşivleyici modülü başlatılamadı.');
+    throw new Error('Could not initialize the ZIP archiver module.');
 }
 
-/** Verilen tema dosyalarını (göreli anahtarlar) arşive ekler */
+/** Adds the given theme files (relative keys) to the archive */
 export function addThemeFiles(archive: any, projectDir: string, files: string[]): void {
     for (const key of files) {
         archive.file(path.join(projectDir, ...key.split('/')), { name: key });
     }
 }
 
-/** Verilen tema dosyalarını bellekte ZIP'ler */
+/** ZIPs the given theme files in memory */
 export function createThemeZipBuffer(projectDir: string, files: string[], level = 6): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
         const bufs: Buffer[] = [];

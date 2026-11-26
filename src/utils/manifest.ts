@@ -16,7 +16,7 @@ export async function readLocalManifest(projectDir: string): Promise<ReadManifes
     try {
         const manifest = await fs.readJson(manifestPath);
         if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
-            return { status: 'invalid', error: 'JSON nesnesi değil / not a JSON object' };
+            return { status: 'invalid', error: 'not a JSON object' };
         }
         return { status: 'ok', manifest };
     } catch (e: any) {
@@ -29,8 +29,8 @@ function isMissing(value: unknown): boolean {
 }
 
 /**
- * Yerel manifesti sunucu manifestiyle birleştirir: yalnızca yerelde eksik (yok, null veya boş)
- * üst seviye alanlar doldurulur. Yerel değerler (themeVersion dahil) hiçbir zaman değişmez.
+ * Merges the local manifest with the server manifest: only top-level fields missing locally (absent, null or empty)
+ * are filled. Local values (including themeVersion) never change.
  */
 export function mergeManifest(local: Manifest, server: Manifest): { merged: Manifest; added: string[] } {
     const merged: Manifest = { ...local };
@@ -46,14 +46,14 @@ export function mergeManifest(local: Manifest, server: Manifest): { merged: Mani
 }
 
 export interface ManifestSyncOptions {
-    /** Kullanıcıya evet/hayır sorusu sorar */
+    /** Asks the user a yes/no question */
     confirm: (message: string, defaultValue: boolean) => Promise<boolean>;
-    /** Etkileşimli terminal mi (değilse dosyaya hiç yazılmaz) */
+    /** Whether this is an interactive terminal (if not, the file is never written) */
     interactive: boolean;
     log: (message: string) => void;
     /**
-     * Yerel marketplaceThemeId farklıysa güncelleme sorusunun varsayılan cevabı.
-     * init'te kullanıcı temayı az önce seçtiği için true, dev/publish'te false.
+     * Default answer to the update question when the local marketplaceThemeId differs.
+     * true in init, since the user just picked the theme; false in dev/publish.
      */
     preferThemeId?: boolean;
 }
@@ -61,10 +61,10 @@ export interface ManifestSyncOptions {
 export type ManifestSyncOutcome = 'unchanged' | 'created' | 'updated' | 'declined' | 'skipped-non-interactive' | 'invalid';
 
 /**
- * crafter-manifest.json dosyasını sunucu manifestiyle güvenli şekilde eşitler.
- * - Yerel dosyanın üzerine asla sunucu manifesti yazılmaz.
- * - Sunucu manifesti yalnızca eksik alanları doldurmak için kullanılır.
- * - Dosyaya yalnızca kullanıcı onay verirse yazılır.
+ * Safely syncs crafter-manifest.json with the server manifest.
+ * - The server manifest never overwrites the local file.
+ * - The server manifest is only used to fill missing fields.
+ * - The file is written only if the user confirms.
  */
 export async function syncManifest(
     projectDir: string,
@@ -76,7 +76,7 @@ export async function syncManifest(
     const local = await readLocalManifest(projectDir);
 
     if (local.status === 'invalid') {
-        options.log(`${MANIFEST_FILE} okunamadı (${local.error}); dosyaya dokunulmadı. / Could not read ${MANIFEST_FILE}; the file was left untouched.`);
+        options.log(`Could not read ${MANIFEST_FILE} (${local.error}); the file was left untouched.`);
         return 'invalid';
     }
 
@@ -85,17 +85,17 @@ export async function syncManifest(
         const data = await fetchServerManifest();
         if (data && typeof data === 'object' && !Array.isArray(data)) server = data;
     } catch {
-        // Sunucu manifesti alınamazsa yalnızca tema kimliğiyle devam edilir
+        // If the server manifest cannot be fetched, continue with the theme ID only
     }
     const serverWithId: Manifest = { marketplaceThemeId: themeId, ...server };
 
     if (local.status === 'missing') {
         if (!options.interactive) {
-            options.log(`${MANIFEST_FILE} bulunamadı; etkileşimli olmayan modda oluşturulmadı. / ${MANIFEST_FILE} not found; not created in non-interactive mode.`);
+            options.log(`${MANIFEST_FILE} not found; not created in non-interactive mode.`);
             return 'skipped-non-interactive';
         }
         const ok = await options.confirm(
-            `${MANIFEST_FILE} bulunamadı. Sunucudaki bilgilerle oluşturulsun mu? / ${MANIFEST_FILE} not found. Create it from the server data?`,
+            `${MANIFEST_FILE} not found. Create it from the server data?`,
             true,
         );
         if (!ok) return 'declined';
@@ -105,20 +105,20 @@ export async function syncManifest(
 
     const { merged, added } = mergeManifest(local.manifest, serverWithId);
 
-    // Yerel manifest başka bir temaya işaret ediyorsa yalnızca kullanıcı onaylarsa kimlik güncellenir
+    // If the local manifest points to another theme, the ID is updated only if the user confirms
     const localId = local.manifest.marketplaceThemeId;
     const idMismatch = typeof localId === 'string' && localId.trim() !== '' && localId.trim() !== themeId;
     let idChanged = false;
     if (idMismatch) {
-        options.log(`${MANIFEST_FILE} başka bir temaya işaret ediyor (marketplaceThemeId: ${localId}, kullanılan: ${themeId}). / ${MANIFEST_FILE} points to another theme.`);
+        options.log(`${MANIFEST_FILE} points to another theme (marketplaceThemeId: ${localId}, in use: ${themeId}).`);
         if (options.interactive) {
             idChanged = await options.confirm(
-                `${MANIFEST_FILE} içindeki marketplaceThemeId ${themeId} olarak güncellensin mi? Diğer alanlar değişmez. / Update marketplaceThemeId to ${themeId}? Other fields are kept.`,
+                `Update marketplaceThemeId in ${MANIFEST_FILE} to ${themeId}? Other fields are kept.`,
                 options.preferThemeId ?? false,
             );
             if (idChanged) merged.marketplaceThemeId = themeId;
         }
-        // Kimlik değişmediyse başka bir temanın sunucu bilgileri bu manifeste eklenmez
+        // If the ID did not change, server data of another theme is not added to this manifest
         if (!idChanged) return 'unchanged';
     }
 
@@ -129,12 +129,12 @@ export async function syncManifest(
     }
 
     if (!options.interactive) {
-        options.log(`${MANIFEST_FILE} dosyasında eksik alanlar var (${added.join(', ')}); etkileşimli olmayan modda dosyaya yazılmadı. / Missing fields in ${MANIFEST_FILE} (${added.join(', ')}); not written in non-interactive mode.`);
+        options.log(`Missing fields in ${MANIFEST_FILE} (${added.join(', ')}); not written in non-interactive mode.`);
         return 'skipped-non-interactive';
     }
 
     const ok = await options.confirm(
-        `${MANIFEST_FILE} dosyasındaki eksik alanlar sunucudan doldurulsun mu? (${added.join(', ')}) Mevcut alanlar değişmez. / Fill missing fields from the server? Existing fields are kept.`,
+        `Fill the missing fields in ${MANIFEST_FILE} from the server? (${added.join(', ')}) Existing fields are kept.`,
         true,
     );
     if (!ok) {
@@ -146,7 +146,7 @@ export async function syncManifest(
     return 'updated';
 }
 
-/** Komutlar için: API üzerinden sunucu manifestini çekip yerel manifesti onaylı şekilde eşitler */
+/** For commands: fetches the server manifest through the API and syncs the local manifest with confirmation */
 export async function syncManifestWithApi(
     projectDir: string,
     themeId: string,
