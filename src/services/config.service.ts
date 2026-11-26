@@ -10,12 +10,12 @@ export interface Config {
     userId?: string;
 }
 
-/** Config dosyası token içerdiği için yalnızca sahibi okuyup yazabilir */
+/** The config file holds tokens, so only its owner can read and write it */
 export const CONFIG_FILE_MODE = 0o600;
 export const CONFIG_DIR_MODE = 0o700;
 
 export class ConfigService {
-    /** CRAFTER_CONFIG_DIR ile farklı klasör seçilebilir (testler ve CI için) */
+    /** A different folder can be chosen with CRAFTER_CONFIG_DIR (for tests and CI) */
     static get configPath(): string {
         const dir = process.env.CRAFTER_CONFIG_DIR || path.join(os.homedir(), '.crafter');
         return path.join(dir, 'config.json');
@@ -43,12 +43,12 @@ export class ConfigService {
         };
     }
 
-    /** Config dosyasını 0600 izinle yazar; dosya önceden daha geniş izinle varsa izni daraltır */
+    /** Writes the config file with 0600 permissions; narrows the permissions if the file already exists with wider ones */
     private static async writeConfigFile(data: Config): Promise<void> {
         const configPath = this.configPath;
         await fs.ensureDir(path.dirname(configPath), { mode: CONFIG_DIR_MODE });
         await fs.writeJson(configPath, data, { spaces: 2, mode: CONFIG_FILE_MODE });
-        // writeFile'daki mode yalnızca yeni dosyada uygulanır; var olan dosyanın izni de düzeltilir
+        // the mode in writeFile only applies to new files; fix the permissions of an existing file too
         await fs.chmod(configPath, CONFIG_FILE_MODE);
     }
 

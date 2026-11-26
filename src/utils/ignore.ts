@@ -2,44 +2,44 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 
 /**
- * Tema dosyaları için tek ortak yok sayma ve izin listesi.
- * ZIP senkronizasyonu (dev, push), paketleme (pack) ve izleyici (dev watch) aynı kuralları kullanır.
+ * Single shared ignore and allow list for theme files.
+ * ZIP sync (dev, push), packaging (pack) and the watcher (dev watch) use the same rules.
  *
- * Sunucudaki kurallarla uyumludur (backend: src/modules/website/v2/theme/theme-file-path.ts):
- * izin verilen uzantılar, 10 MB tekil dosya sınırı ve dosya yolu doğrulaması.
+ * Matches the server rules (backend: src/modules/website/v2/theme/theme-file-path.ts):
+ * allowed extensions, a 10 MB per-file limit and file path validation.
  */
 
-/** Her seviyede yok sayılan klasörler (nokta ile başlayan tüm klasörler de yok sayılır) */
+/** Folders ignored at every level (all folders starting with a dot are ignored too) */
 export const IGNORED_DIRECTORIES = ['node_modules', 'dist'];
 
-/** Her seviyede yok sayılan dosya adları (nokta ile başlayan tüm dosyalar da yok sayılır) */
+/** File names ignored at every level (all files starting with a dot are ignored too) */
 export const IGNORED_FILE_NAMES = ['desktop.ini', 'Thumbs.db'];
 
-/** Yok sayılan uzantılar */
+/** Ignored extensions */
 export const IGNORED_EXTENSIONS = ['.zip'];
 
-/** Yalnızca yerelde tutulan dosyalar: sunucu senkronizasyonda bunları zaten atlar */
+/** Files kept only locally: the server skips these during sync anyway */
 export const LOCAL_ONLY_FILES = ['crafter-manifest.json'];
 
-/** Sunucunun kabul ettiği tema dosyası uzantıları */
+/** Theme file extensions the server accepts */
 export const ALLOWED_THEME_EXTENSIONS = {
     assets: ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf', '.webp', '.gif', '.ico'],
     core: ['.liquid', '.json', '.html'],
 };
 
-/** Sunucunun tekil dosya için kabul ettiği üst sınır (10 MB) */
+/** Upper limit the server accepts for a single file (10 MB) */
 export const MAX_THEME_FILE_BYTES = 10 * 1024 * 1024;
 
 const MAX_THEME_FILE_KEY_LENGTH = 512;
 
-/** Mutlak dosya yolunu tema içindeki göreli, "/" ayraçlı anahtara çevirir */
+/** Converts an absolute file path to a relative, "/"-separated key inside the theme */
 export function toThemeKey(projectDir: string, filePath: string): string {
     return path.relative(projectDir, filePath).split(path.sep).join('/');
 }
 
 /**
- * Göreli yol (dosya veya klasör) hiç dikkate alınmamalı mı?
- * Gizli dosya/klasörler (.env, .git, .crafter, .DS_Store ...), node_modules, dist, .zip vb.
+ * Should the relative path (file or folder) be ignored entirely?
+ * Hidden files/folders (.env, .git, .crafter, .DS_Store ...), node_modules, dist, .zip, etc.
  */
 export function isIgnoredPath(relPath: string): boolean {
     const normalized = relPath.replace(/\\/g, '/');
@@ -68,8 +68,8 @@ export interface SkippedFile {
 }
 
 /**
- * Dosya sunucuya gönderilebilir mi? Gönderilemiyorsa nedeni döner.
- * (Yok sayılan ve yalnızca yerel dosyalar bu kontrolden önce elenir.)
+ * Can the file be uploaded to the server? Returns the reason if not.
+ * (Ignored and local-only files are filtered out before this check.)
  */
 export function getUploadSkipReason(key: string, sizeBytes?: number): SkipReason | null {
     // eslint-disable-next-line no-control-regex
@@ -82,29 +82,29 @@ export function getUploadSkipReason(key: string, sizeBytes?: number): SkipReason
 export function describeSkipReason(reason: SkipReason): string {
     switch (reason) {
         case 'extension':
-            return 'sunucu bu dosya türünü kabul etmiyor / file type not allowed by the server';
+            return 'file type not allowed by the server';
         case 'size':
-            return 'dosya 10 MB sınırını aşıyor / file exceeds the 10 MB limit';
+            return 'file exceeds the 10 MB limit';
         case 'path':
-            return 'dosya yolu geçersiz karakter içeriyor veya çok uzun / invalid or too long file path';
+            return 'invalid or too long file path';
     }
 }
 
 export interface CollectOptions {
-    /** pack için: crafter-manifest.json pakete dahil edilsin mi */
+    /** For pack: whether crafter-manifest.json is included in the package */
     includeLocalOnly?: boolean;
 }
 
 export interface CollectResult {
-    /** Gönderilecek dosyaların göreli anahtarları (sıralı) */
+    /** Relative keys of the files to upload (sorted) */
     files: string[];
-    /** İzin listesi veya boyut nedeniyle atlanan dosyalar */
+    /** Files skipped because of the allow list or size */
     skipped: SkippedFile[];
 }
 
 /**
- * Proje klasöründeki tema dosyalarını ortak kurallarla toplar.
- * Sembolik bağlantılar izlenmez (proje dışındaki dosyalar pakete girmesin).
+ * Collects the theme files in the project folder using the shared rules.
+ * Symbolic links are not followed (so files outside the project do not end up in the package).
  */
 export async function collectThemeFiles(projectDir: string, options: CollectOptions = {}): Promise<CollectResult> {
     const files: string[] = [];
@@ -139,11 +139,11 @@ export async function collectThemeFiles(projectDir: string, options: CollectOpti
     return { files, skipped };
 }
 
-/** Atlanan dosyalar için kısa uyarı satırları (çok fazlaysa özetler) */
+/** Short warning lines for skipped files (summarized if there are too many) */
 export function formatSkippedFiles(skipped: SkippedFile[], limit = 10): string[] {
     const lines = skipped.slice(0, limit).map((s) => `  - ${s.key}: ${describeSkipReason(s.reason)}`);
     if (skipped.length > limit) {
-        lines.push(`  ... ve ${skipped.length - limit} dosya daha / and ${skipped.length - limit} more`);
+        lines.push(`  ... and ${skipped.length - limit} more`);
     }
     return lines;
 }

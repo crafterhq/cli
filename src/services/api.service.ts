@@ -29,12 +29,12 @@ export class ApiService {
                             const accessToken = await this.refreshTokens(apiUrl, currentConfig.refreshToken);
                             axiosConfig.headers.Authorization = `Bearer ${accessToken}`;
                         } catch (error) {
-                            console.error(chalk.red('\nOturumunuz sona erdi. Lütfen npx @crafter-cms/cli login komutu ile tekrar giriş yapın.'));
+                            console.error(chalk.red('\nYour session has expired. Please log in again with npx @crafter-cms/cli login.'));
                             await ConfigService.clearConfig();
                             process.exit(1);
                         }
                     } else {
-                        console.error(chalk.red('\nOturumunuz sona erdi. Lütfen npx @crafter-cms/cli login komutu ile tekrar giriş yapın.'));
+                        console.error(chalk.red('\nYour session has expired. Please log in again with npx @crafter-cms/cli login.'));
                         process.exit(1);
                     }
                 } else {
@@ -48,11 +48,11 @@ export class ApiService {
             (response) => response,
             (error: AxiosError) => {
                 if (error.response?.status === 401) {
-                    console.error(chalk.red('\nOturumunuz sona erdi. Lütfen npx @crafter-cms/cli login komutu ile tekrar giriş yapın.'));
+                    console.error(chalk.red('\nYour session has expired. Please log in again with npx @crafter-cms/cli login.'));
                     process.exit(1);
                 }
                 if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-                    console.error(chalk.red('\nAPI servisine ulaşılamıyor. İnternet bağlantınızı kontrol edin.'));
+                    console.error(chalk.red('\nCannot reach the API service. Check your internet connection.'));
                     process.exit(1);
                 }
                 return Promise.reject(error);
@@ -65,8 +65,8 @@ export class ApiService {
     private static refreshInFlight: Promise<string> | null = null;
 
     /**
-     * Token'ı yeniler ve yeni access/refresh token'ı config dosyasına kaydeder.
-     * Aynı anda gelen istekler (dev izleyicisi) tek bir yenileme isteğini paylaşır.
+     * Refreshes the token and saves the new access/refresh tokens to the config file.
+     * Concurrent requests (the dev watcher) share a single refresh request.
      */
     static refreshTokens(apiUrl: string, refreshToken: string): Promise<string> {
         if (!this.refreshInFlight) {

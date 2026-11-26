@@ -7,8 +7,8 @@ import { makeTempDir } from './helpers';
 const THEME_ID = '11111111-2222-3333-4444-555555555555';
 const SERVER_MANIFEST = {
     marketplaceThemeId: THEME_ID,
-    name: 'Sunucu Adı',
-    description: 'Sunucu açıklaması',
+    name: 'Server Name',
+    description: 'Server description',
     version: '1.0.0',
     author: { id: 'u1', name: 'Dev' },
 };
@@ -36,20 +36,20 @@ function opts(answer: boolean | ((m: string) => boolean), interactive = true) {
 }
 
 describe('mergeManifest', () => {
-    it('yalnızca eksik alanları doldurur, themeVersion ve mevcut alanları korur', () => {
+    it('fills only missing fields and keeps themeVersion and existing fields', () => {
         const local = { marketplaceThemeId: THEME_ID, themeVersion: 2, name: 'Yerel Ad', version: '2.3.0', description: '' };
         const { merged, added } = mergeManifest(local, SERVER_MANIFEST);
         expect(merged.themeVersion).toBe(2);
         expect(merged.name).toBe('Yerel Ad');
         expect(merged.version).toBe('2.3.0');
-        expect(merged.description).toBe('Sunucu açıklaması');
+        expect(merged.description).toBe('Server description');
         expect(merged.author).toEqual(SERVER_MANIFEST.author);
         expect(added.sort()).toEqual(['author', 'description']);
     });
 });
 
-describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
-    it('eksik alan yoksa dosyaya dokunmaz ve soru sormaz', async () => {
+describe('syncManifest: the local manifest is never overwritten', () => {
+    it('does not touch the file or ask when no fields are missing', async () => {
         const local = { ...SERVER_MANIFEST, themeVersion: 2, name: 'v2 Tema' };
         const root = await project(local);
         const before = await rawManifest(root);
@@ -60,7 +60,7 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect(await rawManifest(root)).toBe(before);
     });
 
-    it('kullanıcı reddederse dosya değişmez (themeVersion kaybolmaz)', async () => {
+    it('leaves the file unchanged if the user declines (themeVersion is not lost)', async () => {
         const root = await project({ marketplaceThemeId: THEME_ID, themeVersion: 2 });
         const before = await rawManifest(root);
         const o = opts(false);
@@ -70,17 +70,17 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect(await rawManifest(root)).toBe(before);
     });
 
-    it('kullanıcı onaylarsa yalnızca eksik alanlar eklenir, themeVersion kalır', async () => {
+    it('adds only missing fields if the user confirms, themeVersion stays', async () => {
         const root = await project({ marketplaceThemeId: THEME_ID, themeVersion: 2, version: '2.0.0' });
         const outcome = await syncManifest(root, THEME_ID, async () => SERVER_MANIFEST, opts(true));
         expect(outcome).toBe('updated');
         const m = await readManifest(root);
         expect(m.themeVersion).toBe(2);
         expect(m.version).toBe('2.0.0');
-        expect(m.name).toBe('Sunucu Adı');
+        expect(m.name).toBe('Server Name');
     });
 
-    it('etkileşimli olmayan modda hiçbir şey yazmaz', async () => {
+    it('writes nothing in non-interactive mode', async () => {
         const root = await project({ marketplaceThemeId: THEME_ID, themeVersion: 2 });
         const before = await rawManifest(root);
         const o = opts(true, false);
@@ -90,7 +90,7 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect(await rawManifest(root)).toBe(before);
     });
 
-    it('bozuk JSON dosyasına dokunmaz', async () => {
+    it('does not touch a corrupt JSON file', async () => {
         const root = await project(undefined, '{ "themeVersion": 2, ');
         const o = opts(true);
         const outcome = await syncManifest(root, THEME_ID, async () => SERVER_MANIFEST, o);
@@ -98,7 +98,7 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect(await rawManifest(root)).toBe('{ "themeVersion": 2, ');
     });
 
-    it('sunucu hata verirse dosyaya dokunmaz', async () => {
+    it('does not touch the file if the server returns an error', async () => {
         const root = await project({ marketplaceThemeId: THEME_ID, themeVersion: 2, name: 'x', description: 'y', version: '1', author: {} });
         const before = await rawManifest(root);
         const outcome = await syncManifest(root, THEME_ID, async () => { throw new Error('500'); }, opts(true));
@@ -106,7 +106,7 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect(await rawManifest(root)).toBe(before);
     });
 
-    it('dosya yoksa yalnızca onayla oluşturur', async () => {
+    it('creates the file only with confirmation if it does not exist', async () => {
         const declinedRoot = await project();
         expect(await syncManifest(declinedRoot, THEME_ID, async () => SERVER_MANIFEST, opts(false))).toBe('declined');
         expect(await fs.pathExists(path.join(declinedRoot, MANIFEST_FILE))).toBe(false);
@@ -116,7 +116,7 @@ describe('syncManifest: yerel manifest asla üzerine yazılmaz', () => {
         expect((await readManifest(root)).marketplaceThemeId).toBe(THEME_ID);
     });
 
-    it('başka temaya ait manifestte kimliği onaysız değiştirmez ve o temanın bilgilerini eklemez', async () => {
+    it('does not change the ID of a manifest belonging to another theme without confirmation, and does not add that theme\'s data', async () => {
         const other = { marketplaceThemeId: 'other-theme', themeVersion: 2 };
         const root = await project(other);
         const before = await rawManifest(root);

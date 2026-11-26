@@ -7,14 +7,14 @@ import { createZipArchive, addThemeFiles } from '../utils/zip';
 import { collectThemeFiles, formatSkippedFiles } from '../utils/ignore';
 
 export default class Pack extends Command {
-    static description = 'Temayı dağıtmak veya satmak için .zip dosyası haline getirir.';
+    static description = 'Packs the theme into a .zip file for distribution or sale.';
 
     async run() {
         const projectDir = process.cwd();
         const zipFileName = 'theme.zip';
         const zipFilePath = path.join(projectDir, zipFileName);
 
-        const spinner = ora('Tema paketi oluşturuluyor...').start();
+        const spinner = ora('Creating the theme package...').start();
 
         try {
             // Delete existing zip if any
@@ -25,7 +25,7 @@ export default class Pack extends Command {
             const { files, skipped } = await collectThemeFiles(projectDir, { includeLocalOnly: true });
             if (skipped.length > 0) {
                 spinner.stop();
-                this.log(chalk.yellow(`${skipped.length} dosya pakete eklenmedi / ${skipped.length} file(s) left out of the package:`));
+                this.log(chalk.yellow(`${skipped.length} file(s) left out of the package:`));
                 formatSkippedFiles(skipped).forEach((l) => this.log(chalk.yellow(l)));
                 spinner.start();
             }
@@ -37,7 +37,7 @@ export default class Pack extends Command {
 
             return new Promise<void>((resolve, reject) => {
                 output.on('close', () => {
-                    spinner.succeed(chalk.green(`Başarılı! Tema paketi oluşturuldu: ${zipFileName} (${archive.pointer()} byte)`));
+                    spinner.succeed(chalk.green(`Done! Theme package created: ${zipFileName} (${archive.pointer()} bytes)`));
                     resolve();
                 });
 
@@ -55,14 +55,14 @@ export default class Pack extends Command {
 
                 archive.pipe(output);
 
-                // dev/push ve izleyiciyle aynı ortak yok sayma listesi; crafter-manifest.json pakete dahil
+                // same shared ignore list as dev/push and the watcher; crafter-manifest.json is included in the package
                 addThemeFiles(archive, projectDir, files);
 
                 archive.finalize();
             });
 
         } catch (error: any) {
-            spinner.fail(chalk.red('Paketleme işlemi başarısız oldu.'));
+            spinner.fail(chalk.red('Packaging failed.'));
             this.error(error.message);
         }
     }

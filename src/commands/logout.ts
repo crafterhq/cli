@@ -7,6 +7,6 @@ export default class Logout extends Command {
 
     async run() {
         await ConfigService.clearConfig();
-        this.log(chalk.green('Başarıyla çıkış yapıldı.'));
+        this.log(chalk.green('Logged out.'));
     }
 }

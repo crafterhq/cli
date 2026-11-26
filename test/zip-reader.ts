@@ -1,4 +1,4 @@
-/** Testler için minimal ZIP okuyucu: merkezi dizindeki dosya adlarını döner */
+/** Minimal ZIP reader for tests: returns the file names in the central directory */
 export default function listZipEntries(buf: Buffer): string[] {
     const EOCD = 0x06054b50;
     let eocd = -1;
